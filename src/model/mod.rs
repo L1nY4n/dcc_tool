@@ -1,4 +1,5 @@
 use bytes::{BufMut};
+use tracing::metadata::LevelFilter;
 use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     net::{TcpStream},
@@ -15,6 +16,7 @@ use crate::backend::message::ToFrontend;
 
 pub const MODBUS: Crc<u16> = Crc::<u16>::new(&CRC_16_MODBUS);
 
+#[derive(Debug)]
 pub struct Dcc {
     pub addr: String,
     pub socket: Option<TcpStream>,
@@ -176,7 +178,13 @@ impl Dcc {
                     body: b,
                 })
             }
-            _ => Err("crc check error"),
+            _ =>{
+               if let  [body @ .., crc_h, crc_low] = data {
+                let crc =  MODBUS.checksum(&body);
+                eprintln!("erc expect {:x}",crc)
+               }
+                 Err("crc check error")
+                },
         }
     }
 }
@@ -597,8 +605,8 @@ impl IO for VO {
 
 #[test]
 fn heartbeat_decode_test() {
-    let hb_pkt: &[u8] = &[
-        254, 254, 0, 223, 1, 2, 0, 0, 68, 67, 67, 103, 45, 234, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 139,
+    let hb_pkt: &[u8] = & [
+        254, 254, 0, 223, 1, 2, 1, 0, 0, 0, 0, 0, 0, 9, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 139,
         109, 49, 1, 0, 0, 0, 1, 1, 0, 0, 1, 2, 0, 0, 1, 3, 0, 0, 1, 4, 0, 0, 1, 5, 0, 0, 1, 6, 0,
         0, 1, 7, 0, 0, 1, 8, 0, 0, 1, 9, 0, 0, 1, 10, 0, 0, 1, 11, 0, 0, 1, 12, 0, 0, 1, 13, 0, 0,
         1, 14, 0, 0, 1, 15, 0, 0, 1, 16, 0, 0, 1, 17, 0, 0, 1, 18, 0, 0, 1, 19, 0, 0, 2, 0, 0, 0,
@@ -606,7 +614,7 @@ fn heartbeat_decode_test() {
         0, 0, 3, 4, 0, 0, 3, 5, 0, 0, 3, 6, 0, 0, 4, 0, 15, 160, 4, 1, 15, 160, 4, 2, 15, 160, 4,
         3, 15, 160, 4, 4, 15, 160, 7, 0, 0, 44, 7, 1, 0, 44, 7, 2, 0, 40, 7, 3, 11, 180, 7, 4, 11,
         179, 7, 5, 11, 180, 7, 6, 11, 179, 8, 0, 7, 189, 8, 1, 7, 189, 8, 2, 7, 189, 253, 0, 1, 13,
-        254, 0, 1, 1, 215, 214,
+        254, 0, 1, 1, 0x14, 0x2e,
     ];
     Dcc::decode(hb_pkt);
 }

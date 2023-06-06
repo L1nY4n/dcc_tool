@@ -38,16 +38,20 @@ impl Backend {
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 if let Ok(client) = stream {
+                 
                     let (dcc_s, dcc_r) = unbounded();
                     let addr = client.peer_addr().unwrap().ip().to_string();
+                    eprintln!("income {}",addr);
                     let mut new_dcc = Dcc::default();
                     new_dcc.addr = addr.clone();
                     {
                         let mut dcc_pipe = dcc_pipe_clone.lock().unwrap();
                         dcc_pipe.insert(addr, dcc_s);
                     }
-
-                    new_dcc.init(client, self.back_tx.clone(), dcc_r);
+                    let tx_clone =  self.back_tx.clone();
+                    std::thread::spawn( move || {
+                    new_dcc.init(client, tx_clone, dcc_r);
+                });
                 }
             }
         });

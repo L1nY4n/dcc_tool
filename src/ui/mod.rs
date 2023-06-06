@@ -632,6 +632,7 @@ impl App for DccTestApp {
             match rx.try_recv() {
                 Ok(message) => match message {
                     ToFrontend::DccPacket(addr, pkt) => {
+                        eprintln!("{:?}",pkt.header.device_id);
                         let dev_id = pkt.header.device_id;
                         let dcc = self.dccs.entry(dev_id).or_insert(Dcc {
                             addr: addr,
@@ -656,6 +657,8 @@ impl App for DccTestApp {
             .frame(Frame::none())
             .show(ctx, |ui| {
                 //  self.render_stocks(ctx, ui);
+            
+                ui.label(self.dccs.len().to_string());
                 self.render_dccs(ctx, ui)
             });
        // self.setting_panel(ctx);
