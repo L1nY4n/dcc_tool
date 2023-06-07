@@ -1,8 +1,8 @@
 use crate::model::Dcc;
 use crate::model::DccCmd;
 use std::collections::HashMap;
+pub mod  status_led;
 use std::thread;
-
 use eframe::{
     egui::{
         self, menu,
@@ -15,6 +15,8 @@ use eframe::{
     App, CreationContext,
 };
 use serde::{Deserialize, Serialize};
+
+use self::status_led::StatusLed;
 
 use super::backend::{
     message::{ToBackend, ToFrontend},
@@ -254,13 +256,9 @@ impl DccTestApp {
                             ui.spacing_mut().item_spacing = Vec2::ZERO;
                             ui.horizontal_wrapped(|ui| {
                                 for di in &dcc.io_data.di_list {
-                                    let color = if di.parse_value == 1 {
-                                        Color32::YELLOW
-                                    } else {
-                                        Color32::GRAY
-                                    };
-                                    let _ =
-                                        ui.button(RichText::new(di.index.to_string()).color(color));
+                                
+                                   ui.label(di.index.to_string());
+                                   ui.add(StatusLed::new(&(di.parse_value == 1)).set_size(24.0));
                                     ui.add_space(3.0);
                                 }
                             });
@@ -302,12 +300,13 @@ impl DccTestApp {
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 for o in &dcc.io_data.ai_list {
+                                    ui.label(o.index.to_string());
                                     let _ = ui.label(
                                         RichText::new(o.parse_value.to_string())
                                             .color(Color32::WHITE),
                                     );
-
-                                    ui.label(RichText::new("mA").color(Color32::YELLOW));
+                                    ui.label(RichText::new("mA").color(Color32::GREEN));
+                                    ui.separator();
                                 }
                             });
                         });
@@ -346,12 +345,14 @@ impl DccTestApp {
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 for o in &dcc.io_data.via_list {
+                                    ui.label(o.index.to_string());
                                     let _ = ui.label(
                                         RichText::new(o.parse_value.to_string())
-                                            .color(Color32::RED),
+                                            .color(Color32::WHITE),
                                     );
-                                    ui.label(RichText::new("V").color(Color32::BLUE));
-                                    ui.add_space(3.0);
+                                    ui.label(RichText::new("V").color(Color32::YELLOW));
+                                    ui.separator();
+                                    ui.add_space(4.0);
                                 }
                                 ui.add_space(3.0);
                                 for o in &dcc.io_data.vir_list {
@@ -658,7 +659,6 @@ impl App for DccTestApp {
             .show(ctx, |ui| {
                 //  self.render_stocks(ctx, ui);
             
-                ui.label(self.dccs.len().to_string());
                 self.render_dccs(ctx, ui)
             });
        // self.setting_panel(ctx);
