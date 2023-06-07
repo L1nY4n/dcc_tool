@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use dcc_tool::ui::DccTestApp;
 use eframe::{epaint::Vec2, run_native, NativeOptions};
 use tracing_subscriber;

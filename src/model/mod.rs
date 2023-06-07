@@ -1,9 +1,8 @@
 use bytes::{BufMut};
-use tracing::metadata::LevelFilter;
 use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     net::{TcpStream},
-    time::{SystemTime, UNIX_EPOCH}
+    time::{SystemTime, UNIX_EPOCH}, sync::{Arc, Mutex}
 };
 
 use crc::{Crc, CRC_16_MODBUS};
@@ -19,6 +18,7 @@ pub const MODBUS: Crc<u16> = Crc::<u16>::new(&CRC_16_MODBUS);
 #[derive(Debug)]
 pub struct Dcc {
     pub addr: String,
+    pub  dcc_id : Arc::<Mutex::<u64>>,
     pub socket: Option<TcpStream>,
     pub device_type: u8,
     pub device_id: u64,
@@ -38,6 +38,7 @@ impl Default for Dcc {
             device_id: Default::default(),
             io_data: Default::default(),
             sender: None,
+            dcc_id: Arc::new(Mutex::new(0u64)),
         }
     }
 }
@@ -45,9 +46,12 @@ impl Default for Dcc {
 impl Dcc {
     pub fn init(&mut self, stream: TcpStream, sender: Sender<ToFrontend>, cmd_r: Receiver<DccCmd>) {
         eprintln!("dcc socket init");
+
+
         let mut writer = BufWriter::new((stream.try_clone().unwrap()));
         self.socket = Some(stream);
         self.sender = Some(sender);
+        let dcc_id_clone = Arc::clone(&self.dcc_id);
         std::thread::spawn(move || {
             eprintln!("cmd receive");
             loop {
@@ -55,11 +59,11 @@ impl Dcc {
                                     recv(cmd_r)->cmd =>{
                                         if let Ok(c) = cmd {
                                             eprintln!("{:?}",c);
-                                            
+                                            let  addr = dcc_id_clone.lock().unwrap();
                                             match c {
                                             DccCmd::DO(do_ctr) => {
 
-                                            let mut pkt =  DccPacket::do_ctr(do_ctr,&0u64,&0u8);
+                                            let mut pkt =  DccPacket::do_ctr(do_ctr,&addr,&0u8);
                                             eprintln!("send: {:?}",pkt);
                                              let data = pkt.encode();
                                              eprintln!("send: {:x?}",data);
@@ -69,7 +73,7 @@ impl Dcc {
                                               writer.flush().unwrap()
                                             },
                                             DccCmd::AO(io) =>{
-                                                let mut  pkt =  DccPacket::ao_ctr(io,&0u64,&0u8);
+                                                let mut  pkt =  DccPacket::ao_ctr(io,&addr,&0u8);
                                                 eprintln!("send: {:?}",pkt);
                                                 let data = pkt.encode();
                                                 eprintln!("send: {:x?}",data);
@@ -78,7 +82,7 @@ impl Dcc {
                                                 writer.flush().unwrap()
                                             },
                                             DccCmd::VO(io) =>{
-                                                let mut  pkt =  DccPacket::vo_ctr(io,&0u64,&0u8);
+                                                let mut  pkt =  DccPacket::vo_ctr(io,&addr,&0u8);
                                                 eprintln!("send: {:?}",pkt);
                                                 let data = pkt.encode();
                                                 eprintln!("send: {:x?}",data);
@@ -124,6 +128,8 @@ impl Dcc {
             match Self::decode(&rx_bytes[..bytes_read]) {
                 Ok(dcc_packet) => match &dcc_packet.body {
                     DccPacketBody::HeartBeat(_) => {
+                      let mut dcc_id  =  self.dcc_id.lock().unwrap();
+                      *dcc_id = dcc_packet.header.device_id;
                         if let Some(s) = &self.sender {
                             s.try_send(ToFrontend::DccPacket(
                                 self.addr.clone(),
@@ -393,16 +399,12 @@ impl TryFrom<&[u8]> for IoData {
             let mut io_data = Self::default();
             for x in value[1..(io_count * 4 + 1).into()].chunks(4) {
                 let io_type = x[0];
-                let io_index = x[1];
                 match io_type {
                     t if t == IoType::DI as u8 => io_data.di_list.push(DI::parse(x)),
                     t if t == IoType::DO as u8 => io_data.do_list.push(DO::parse(x)),
                     t if t == IoType::AI as u8 => io_data.ai_list.push(AI::parse(x)),
                     t if t == IoType::AO as u8 => io_data.ao_list.push(AO::parse(x)),
-                    t if t == IoType::VI as u8 && io_index < 3 => {
-                        io_data.via_list.push(VIA::parse(x))
-                    }
-                    t if t == IoType::VI as u8 => io_data.vir_list.push(VIR::parse(x)),
+                    t if t == IoType::VI as u8 =>  io_data.via_list.push(VIA::parse(x)),
                     t if t == IoType::VO as u8 => io_data.vo_list.push(VO::parse(x)),
                     _ => eprintln!("unknow type"),
                 }

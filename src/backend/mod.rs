@@ -32,7 +32,7 @@ impl Backend {
         }
     }
 
-    pub fn init(mut self) {
+    pub fn init(self) {
         let listener = TcpListener::bind("0.0.0.0:6000").unwrap();
         let dcc_pipe_clone = Arc::clone(&self.dcc_pipe);
         std::thread::spawn(move || {
